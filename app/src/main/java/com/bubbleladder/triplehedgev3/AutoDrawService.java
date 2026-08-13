@@ -77,7 +77,7 @@ public class AutoDrawService extends Service {
         String text="다음 "+TripleCore.countdownText()+" · 제외 "+(exc>=1&&exc<=4?TripleCore.COMBO[exc]:"-")+" · "+grade+" · "+context+" · "+triple+" · 실전 "+TripleCore.liveRate(this);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL_ID):new Notification.Builder(this);
         return b.setSmallIcon(android.R.drawable.ic_popup_sync)
-                .setContentTitle("보글사다리3 삼치기 Hedge V3 · 백그라운드 ON")
+                .setContentTitle("보글사다리3 삼치기 Hedge V3.1 · 백그라운드 ON")
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
                 .setOngoing(true).setOnlyAlertOnce(true).setContentIntent(pi).build();

@@ -27,6 +27,7 @@ public final class TripleCore {
             K_LAST_GAP="last_gap_v3", K_LAST_CONTEXT="last_context_v3", K_LAST_SYNC="last_sync_v3";
 
     public static final int MAX_HISTORY=5000, BT_LIMIT=650, ENGINE_COUNT=9, CONTEXT_COUNT=4;
+    public static final int LOCAL_BONUS_MIN=8, LOCAL_BONUS_FULL=16, CONTEXT_BIAS_FULL=20;
     public static final String[] COMBO={"","좌3짝","좌4홀","우3홀","우4짝"};
     public static final String[] ENGINE={
             "최근8 가중","최근15 가중","최근30 안정",
@@ -314,19 +315,72 @@ public final class TripleCore {
     }
 
     private static double adaptiveWeight(Perf global,Perf local,int engine,int ctx){
+        // V3.1 sample guard:
+        // 같은 상황 2/2, 3/3 같은 작은 표본이 100%로 보여도 가중치 보너스를 주지 않는다.
+        // 긍정 보너스는 8회부터 시작하고 16회에서 100% 반영한다.
+        // 상황별 고정 bias도 표본이 쌓이기 전에는 잠근다.
         double ga=shrink(global.rate(),global.n,90,.75);
         double gr=shrink(global.recentRate(),global.rn,32,.75);
         double ca=shrink(local.rate(),local.n,42,.75);
         double cr=shrink(local.recentRate(),local.rn,18,.75);
 
-        double reward=3.0*Math.max(0,ga-.75)+4.0*Math.max(0,gr-.75)
-                +4.5*Math.max(0,ca-.75)+5.5*Math.max(0,cr-.75);
-        double penalty=7.0*Math.max(0,.75-ga)+9.0*Math.max(0,.75-gr)
-                +10.0*Math.max(0,.75-ca)+12.0*Math.max(0,.75-cr);
+        double globalReward=3.0*Math.max(0,ga-.75)+4.0*Math.max(0,gr-.75);
+        double globalPenalty=7.0*Math.max(0,.75-ga)+9.0*Math.max(0,.75-gr);
+        double localReward=4.5*Math.max(0,ca-.75)+5.5*Math.max(0,cr-.75);
+        double localPenalty=10.0*Math.max(0,.75-ca)+12.0*Math.max(0,.75-cr);
 
-        double evidence=Math.min(1.0,(global.n+local.n)/(global.n+local.n+90.0));
-        double w=(1.0+(reward-penalty)*evidence)*contextBias(engine,ctx);
-        return clamp(w,.08,3.0);
+        double globalEvidence=Math.min(1.0,global.n/(global.n+55.0));
+        double localEvidence=Math.min(1.0,local.n/(local.n+28.0));
+
+        double positiveGate=localPositiveGate(local.n);
+        double negativeGate=localNegativeGate(local.n);
+
+        double w=1.0
+                +(globalReward-globalPenalty)*globalEvidence
+                +localReward*localEvidence*positiveGate
+                -localPenalty*localEvidence*negativeGate;
+
+        // 기존 상황별 선호도는 '가설'로만 사용한다.
+        // 같은 상황 표본이 8회 미만이면 완전히 끄고, 20회까지 서서히 연다.
+        double bias=contextBias(engine,ctx);
+        double biasGate=contextBiasGate(local.n);
+        if(bias>1.0 && ca<=.75) biasGate=0.0;
+        if(bias<1.0 && ca>=.75) biasGate=0.0;
+        double effectiveBias=1.0+(bias-1.0)*biasGate;
+
+        return clamp(w*effectiveBias,.15,2.20);
+    }
+
+    private static double localPositiveGate(int n){
+        if(n<LOCAL_BONUS_MIN)return 0.0;
+        if(n>=LOCAL_BONUS_FULL)return 1.0;
+        return .25+.75*(n-LOCAL_BONUS_MIN)/(double)(LOCAL_BONUS_FULL-LOCAL_BONUS_MIN);
+    }
+
+    private static double localNegativeGate(int n){
+        // 나쁜 신호도 1~3회만으로 과잉 벌점을 주지 않는다.
+        if(n<4)return 0.0;
+        if(n>=12)return 1.0;
+        return .25+.75*(n-4)/8.0;
+    }
+
+    private static double contextBiasGate(int n){
+        if(n<LOCAL_BONUS_MIN)return 0.0;
+        if(n>=CONTEXT_BIAS_FULL)return 1.0;
+        return (n-LOCAL_BONUS_MIN)/(double)(CONTEXT_BIAS_FULL-LOCAL_BONUS_MIN);
+    }
+
+    public static String contextSampleLabel(int n){
+        if(n<LOCAL_BONUS_MIN)return "표본부족 · 상황보너스 0%";
+        if(n<LOCAL_BONUS_FULL){
+            int pct=(int)Math.round(localPositiveGate(n)*100.0);
+            return "부분반영 "+pct+"%";
+        }
+        if(n<CONTEXT_BIAS_FULL){
+            int pct=(int)Math.round(contextBiasGate(n)*100.0);
+            return "성적 100%반영 · 상황bias "+pct+"%";
+        }
+        return "충분표본 · 100%반영";
     }
 
     private static double contextBias(int e,int ctx){

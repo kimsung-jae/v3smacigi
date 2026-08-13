@@ -10,8 +10,8 @@ android {
         applicationId "com.bubbleladder.triplehedgev3"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "3.0-standalone-v3"
+        versionCode 2
+        versionName "3.1-sample-guard"
     }
 
     compileOptions {

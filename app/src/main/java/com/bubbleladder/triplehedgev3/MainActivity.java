@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14),dp(16),dp(14),dp(30));root.setBackgroundColor(Color.rgb(7,19,26));sv.addView(root);
 
-        root.addView(tv("보글사다리3 · 삼치기 Hedge V3",24,Color.WHITE,true));
+        root.addView(tv("보글사다리3 · 삼치기 Hedge V3.1",24,Color.WHITE,true));
         TextView sub=tv("4확률 경쟁 · 상황별 Hedge · 제외실패 학습 · 유사상황 보조검증",12,Color.rgb(110,231,183),false);
         sub.setPadding(0,dp(4),0,dp(14));root.addView(sub);
 
@@ -197,7 +197,8 @@ public class MainActivity extends Activity {
         candidates.setText(cr);
 
         StringBuilder es=new StringBuilder();
-        es.append("현재 상황: ").append(a.context).append(" · 같은 상황 성적을 가중치에 추가 반영\n\n");
+        es.append("현재 상황: ").append(a.context).append(" · 표본 8회 전에는 상황 보너스 0%\n")
+                .append("8~15회는 부분반영 · 16회부터 성적 100% · 상황 고정bias는 20회까지 단계적 반영\n\n");
         for(int e=0;e<TripleCore.ENGINE_COUNT;e++){
             TripleCore.Perf g=a.enginePerf[e],c=a.contextPerf[e];
             es.append("• ").append(TripleCore.ENGINE[e]).append("\n")
@@ -207,6 +208,7 @@ public class MainActivity extends Activity {
                 es.append("\n  → 단독 가중 금지 · 유사상황은 10~18% 범위 보조판정");
             }else{
                 es.append("\n  현재상황 ").append(c.hit).append("/").append(c.n).append(c.n>0?" "+TripleCore.pct(c.rate()):"")
+                        .append(" · ").append(TripleCore.contextSampleLabel(c.n))
                         .append(" · 최종가중 ").append(String.format(Locale.KOREA,"%.2f",g.weight));
             }
             if(e<TripleCore.ENGINE_COUNT-1)es.append("\n\n");
